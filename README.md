@@ -82,10 +82,10 @@ var inst *instrument.Instrument
 func main() {
 	// Initialise instrument with a provided custom sink
 	var err error
-    inst, err = instrument.NewInstrumentWithSinker(&CustomSinkImplementation{})
-    if err != nil {
-        // handle error
-    }
+    	inst, err = instrument.NewInstrumentWithSinker(&CustomSinkImplementation{})
+    	if err != nil {
+        	// handle error
+    	}
 }
 ```
 
