@@ -44,15 +44,15 @@ func sleepFunction() {
 
 func main() {
 	// Initialise instrument
-    inst = instrument.NewInstrument()
+   	inst = instrument.NewInstrument()
    
-    // Generate timers
-    for i := 0; i<3; i++ {
-        go sleepFunction()
-    }
+   	// Generate timers
+	for i := 0; i<3; i++ {
+        	go sleepFunction()
+    	}
     
-    // Sleep the main thread to allow the stdout sink to print recorded measurements
-    time.Sleep(10*time.Second)
+    	// Sleep the main thread to allow the stdout sink to print recorded measurements
+    	time.Sleep(10*time.Second)
 }
 ```
 
