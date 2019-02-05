@@ -2,7 +2,6 @@ package instrument
 
 import (
 	"errors"
-	"math/rand"
 	"time"
 )
 
@@ -17,9 +16,6 @@ func (i *Instrument) shutdown() {
 // Counter records a counter measurement with a string name and int value.
 func (i *Instrument) Counter(measurement string, value int) {
 	i.sink.Counter(Counter{measurement, value})
-
-	r := rand.Intn(3)
-	time.Sleep(time.Duration(r)*time.Second)
 }
 
 // Gauge records a gauge measurement with a string name and a float64 value.
