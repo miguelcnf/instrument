@@ -1,6 +1,7 @@
 package instrument
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -11,23 +12,34 @@ const timerSleepAsync = "timer.sleep.function.async"
 var instrument *Instrument
 
 type mockSink struct {
-	receivedTimer Timer
-	receivedCounter Counter
-	receivedGauge Gauge
+	// Mutex to not trigger data races false positives
+	lock             sync.Mutex
+	rcvTimer         Timer
 	shutdownIsCalled bool
-
 }
 
-func (m *mockSink) Timer(timer Timer) {
-	m.receivedTimer = timer
-}
-
-func (m *mockSink) Counter(counter Counter) {
-	m.receivedCounter = counter
+func (m *mockSink) Flush() {
+	panic("implement me")
 }
 
 func (m *mockSink) Gauge(gauge Gauge) {
-	m.receivedGauge = gauge
+	panic("implement me")
+}
+
+func (m *mockSink) Counter(counter Counter) {
+	panic("implement me")
+}
+
+func (m *mockSink) Timer(timer Timer) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.rcvTimer = timer
+}
+
+func (m *mockSink) RcvTimer() Timer {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.rcvTimer
 }
 
 func (m *mockSink) Shutdown() {
@@ -37,13 +49,13 @@ func (m *mockSink) Shutdown() {
 func sleepFunction() {
 	defer instrument.Timer(timerSleep, Now())
 
-	time.Sleep(1*time.Second)
+	time.Sleep(1 * time.Second)
 }
 
 func sleepFunctionAsync(done chan bool) {
 	defer instrument.Timer(timerSleepAsync, Now())
 
-	time.Sleep(1*time.Second)
+	time.Sleep(1 * time.Second)
 
 	done <- true
 }
@@ -59,12 +71,12 @@ func TestTimer(t *testing.T) {
 
 	sleepFunction()
 
-	if sink.receivedTimer.name != timerSleep {
-		t.Errorf("expected received timer name to be: %v but was: %v", timerSleep, sink.receivedTimer.name)
+	if sink.RcvTimer().name != timerSleep {
+		t.Errorf("expected received timer name to be: %v but was: %v", timerSleep, sink.RcvTimer().name)
 	}
 
-	if sink.receivedTimer.value.Seconds() < 1*time.Second.Seconds() {
-		t.Errorf("expected receiver timer value to be at least 1 second but was: %vs", sink.receivedTimer.value)
+	if sink.RcvTimer().value.Seconds() < 1*time.Second.Seconds() {
+		t.Errorf("expected receiver timer value to be at least 1 second but was: %vs", sink.RcvTimer().value)
 	}
 
 	instrument.shutdown()
@@ -86,15 +98,15 @@ func TestTimerAsync(t *testing.T) {
 	done := make(chan bool)
 	go sleepFunctionAsync(done)
 
-	_ = <- done
+	_ = <-done
 	close(done)
 
-	if sink.receivedTimer.name != timerSleepAsync {
-		t.Errorf("expected received timer name to be: %v but was: %v", timerSleepAsync, sink.receivedTimer.name)
+	if sink.RcvTimer().name != timerSleepAsync {
+		t.Errorf("expected received timer name to be: %v but was: %v", timerSleepAsync, sink.RcvTimer().name)
 	}
 
-	if sink.receivedTimer.value.Seconds() < 1*time.Second.Seconds() {
-		t.Errorf("expected receiver timer value to be at least 1 second but was: %vs", sink.receivedTimer.value)
+	if sink.RcvTimer().value.Seconds() < 1*time.Second.Seconds() {
+		t.Errorf("expected receiver timer value to be at least 1 second but was: %vs", sink.RcvTimer().value)
 	}
 
 	instrument.shutdown()

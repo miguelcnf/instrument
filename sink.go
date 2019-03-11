@@ -11,6 +11,7 @@ type Sinker interface {
 	Timer(timer Timer)
 	Counter(counter Counter)
 	Gauge(gauge Gauge)
+	Flush()
 	Shutdown()
 }
 
@@ -30,31 +31,48 @@ type Gauge struct {
 }
 
 type Sink struct {
-	quit     chan struct{}
+	flush    chan bool
+	input    chan interface{}
+	quit     chan bool
 	timers   []Timer
 	counters []Counter
 	gauges   []Gauge
 }
 
 func (s *Sink) Timer(timer Timer) {
-	s.timers = append(s.timers, timer)
+	s.input <- timer
 }
 
 func (s *Sink) Counter(counter Counter) {
-	s.counters = append(s.counters, counter)
+	s.input <- counter
 }
 
 func (s *Sink) Gauge(gauge Gauge) {
-	s.gauges = append(s.gauges, gauge)
+	s.input <- gauge
 }
 
-func (s *Sink) flush() {
-	s.flushTimers()
-	s.flushCounters()
-	s.flushGauges()
+func (s *Sink) Flush() {
+	s.flush <- true
 }
 
-func (s *Sink) flushTimers() {
+func (s *Sink) print() {
+	fmt.Println("buffer: flushing measurements")
+	s.printTimers()
+	s.printCounters()
+	s.printGauges()
+}
+
+func (s *Sink) Shutdown() {
+	s.quit <- true
+}
+
+func NewStdoutSink() *Sink {
+	sink := &Sink{}
+	sink.quit, sink.input, sink.flush = sink.process()
+	return sink
+}
+
+func (s *Sink) printTimers() {
 	for _, timer := range s.timers {
 		val := float64(timer.value) / float64(time.Millisecond)
 		fmt.Printf("measurement: %v; type: timer; value: %vms\n", timer.name, val)
@@ -62,46 +80,57 @@ func (s *Sink) flushTimers() {
 	s.timers = []Timer{}
 }
 
-func (s *Sink) flushCounters() {
+func (s *Sink) printCounters() {
 	for _, counter := range s.counters {
 		fmt.Printf("measurement: %v; type: counter; value: %v\n", counter.name, counter.value)
 	}
 	s.counters = []Counter{}
 }
 
-func (s *Sink) flushGauges() {
-	for _, gauge := range s.gauges{
+func (s *Sink) printGauges() {
+	for _, gauge := range s.gauges {
 		fmt.Printf("measurement: %v; type: gauge; value: %v\n", gauge.name, gauge.value)
 	}
 	s.gauges = []Gauge{}
 }
 
-func NewStdoutSink() *Sink {
-	sink := &Sink{}
-	sink.quit = sink.flushCycle()
-	return sink
-}
-
-func (s *Sink) Shutdown() {
-	close(s.quit)
-	s.flush()
-}
-
-func (s *Sink) flushCycle() chan struct{} {
+func (s *Sink) process() (quit chan bool, input chan interface{}, flush chan bool) {
 	ticker := time.NewTicker(flushPeriod)
 
-	quit := make(chan struct{})
+	flush = make(chan bool)
+	// Buffered input channel
+	input = make(chan interface{}, 10)
+	quit = make(chan bool)
+
 	go func() {
 		for {
 			select {
+			case rcv := <-input:
+				s.receive(rcv)
+			case <-flush:
+				s.print()
 			case <-ticker.C:
-				s.flush()
+				s.print()
 			case <-quit:
 				ticker.Stop()
+				// Not closing the input channel to avoid panic from producer go routines
+				close(quit)
+				s.print()
 				return
 			}
 		}
 	}()
 
-	return quit
+	return
+}
+
+func (s *Sink) receive(measurement interface{}) {
+	switch measurement.(type) {
+	case Timer:
+		s.timers = append(s.timers, measurement.(Timer))
+	case Counter:
+		s.counters = append(s.counters, measurement.(Counter))
+	case Gauge:
+		s.gauges = append(s.gauges, measurement.(Gauge))
+	}
 }
