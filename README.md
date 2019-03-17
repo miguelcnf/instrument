@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/miguelcnf/instrument?status.svg)](https://godoc.org/github.com/miguelcnf/instrument)
 
-Instrument is an overly simplified, self-contained and idiomatic library (calling it a library is such an over-statement) to provide code level instrumentation for go programs.
+Instrument is is an experiment and is in no way ready to be used in production. It is an overly simplified, self-contained and idiomatic library (calling it a library is such an over-statement) to provide code level instrumentation for go programs.
 
 # Concepts
 
@@ -89,12 +89,6 @@ func main() {
 }
 ```
 
-# Notice
-
-This is an experiment and is in no way ready to be used in production.
-
 # License
 
 See the [LICENSE](LICENSE.md) file for license rights and limitations (MIT).
-
-
